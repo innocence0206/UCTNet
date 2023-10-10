@@ -1,4 +1,4 @@
-# UCTNet: UCTNet: Uncertainty-Guided CNN-Transformer Hybrid Networks for Medical Image Segmentation
+# UCTNet: Uncertainty-Guided CNN-Transformer Hybrid Networks for Medical Image Segmentation
 This repo is the official implementation for UCTNet.
 
 ## Prerequisites
