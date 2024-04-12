@@ -31,7 +31,7 @@ PLEASE READ paths.md FOR INFORMATION TO HOW TO SET THIS UP
 
 base = "/home/gxy/dataset/nnUNet_raw_data_base"
 preprocessing_output_dir = "/home/gxy/data_pro/nnUNet_preprocessed"
-network_training_output_dir_base = "/home/gxy/code/UCTNet-main/UCTNet/nnUNet_trained_models"
+network_training_output_dir_base = "/home/gxy/code/UCTNet/UCTNet/nnUNet_trained_models"
 
 if base is not None:
     nnUNet_raw_data = join(base, "nnUNet_raw_data")

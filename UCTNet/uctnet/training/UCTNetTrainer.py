@@ -201,7 +201,7 @@ class UCTNetTrainer(nnUNetTrainer):
                                     conv_kernel_sizes=self.net_conv_kernel_sizes,
                                     deep_supervision=True,
                                     max_num_features=24*13,
-                                    bound_width=[5, 3, 3, 3, 3, 3],
+                                    bound_sizes=[9, 7, 3, 3, 3, 3],
                                     dmodels=[768, 768, 768, 768, 768, 768],
                                     depths=[1, 1, 1, 1, 1, 1],
                                     num_heads=[3, 3, 3, 6, 12, 24],
@@ -218,7 +218,7 @@ class UCTNetTrainer(nnUNetTrainer):
                                     conv_kernel_sizes=self.net_conv_kernel_sizes,
                                     deep_supervision=True,
                                     max_num_features=24*13,
-                                    bound_width=[9, 7, 3, 3, 3, 3],
+                                    bound_sizes=[5, 3, 3, 3, 3, 3],
                                     dmodels=[768, 768, 768, 768, 768, 768],
                                     depths=[1, 1, 1, 1, 1, 1],
                                     num_heads=[3, 3, 3, 6, 12, 24],
@@ -235,7 +235,7 @@ class UCTNetTrainer(nnUNetTrainer):
                                     conv_kernel_sizes=self.net_conv_kernel_sizes,
                                     deep_supervision=True,
                                     max_num_features=24*13,
-                                    bound_width=[11, 7, 3, 3, 3, 3],
+                                    bound_sizes=[11, 7, 3, 3, 3, 3],
                                     dmodels=[768, 768, 768, 768, 768, 768],
                                     depths=[1, 1, 1, 1, 1, 1],
                                     num_heads=[3, 3, 3, 6, 12, 24],
@@ -769,12 +769,8 @@ class UCTNetTrainer(nnUNetTrainer):
             epoch_start_time = time.time()
             train_losses_epoch = []
 
-            if self.epoch in [199,299,399,499,599,699,799,899,999]:
-                self.save_latest_only = False
-                self.save_every = 1
-            else:
-                self.save_latest_only = True
-                self.save_every = 50
+            self.save_latest_only = True
+            self.save_every = 50
             
             # train one epoch
             self.network.train()

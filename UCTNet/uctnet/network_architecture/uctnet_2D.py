@@ -88,7 +88,7 @@ def UnoB(tar,amap,S):
 
 class BasicLayer(nn.Module):
 
-    def __init__(self, num_stage, num_pool, base_num_features, input_resolution=None, bound_width=None, 
+    def __init__(self, num_stage, num_pool, base_num_features, input_resolution=None, bound_size=None, 
                  dmodel=None, depth=None, num_heads=None, add_Map=True, patch_size=None, dim_head=None, 
                  image_channels=1, num_conv_per_stage=2, conv_op=None, norm_op=None, norm_op_kwargs=None, 
                  dropout_op=None, dropout_op_kwargs=None, nonlin=None, nonlin_kwargs=None,
@@ -102,7 +102,7 @@ class BasicLayer(nn.Module):
         self.use_checkpoint = use_checkpoint
         self.is_encoder = is_encoder
         self.num_classes = num_classes
-        self.bound_size = bound_width
+        self.bound_size = bound_size
         dim = min((base_num_features * feat_map_mul_on_downscale **
                        num_stage), max_num_features)
         conv_kwargs = {'stride': 1, 'dilation': 1, 'bias': True}
@@ -132,7 +132,7 @@ class BasicLayer(nn.Module):
                            nonlin, nonlin_kwargs) for _ in range(num_conv_per_stage - 1)]))
 
         # build blocks
-        if not is_encoder and num_stage in [0,1,2,3,4]:
+        if not is_encoder and num_stage < self.num_pool:
             self.vit_blocks = Vision_Transformer(dim=dim, dmodel=dmodel, input_resolution=input_resolution, 
                                 num_heads=num_heads, patch_size=patch_size, dropout=0.1,
                                 in_depth=depth, add_Map=add_Map, dim_head=dim_head)
@@ -149,7 +149,7 @@ class BasicLayer(nn.Module):
         
         if not is_encoder:
             self.deep_supervision = DeepSupervision(dim, num_classes)
-            self.deep_supervision_T = DeepSupervision(dim, num_classes) if (num_stage in [0,1,2,3,4]) else None
+            self.deep_supervision_T = DeepSupervision(dim, num_classes) if num_stage < self.num_pool else None
             self.deep_supervision_out = DeepSupervision(dim, num_classes) if num_stage==0 else None
         else:
             self.deep_supervision = None
@@ -164,12 +164,12 @@ class BasicLayer(nn.Module):
         if self.deep_supervision is not None:
             ds = self.deep_supervision(x)
         
-        if not self.is_encoder and self.num_stage in [0,1,2,3,4]:
+        if not self.is_encoder and self.num_stage < self.num_pool:
             s = x.detach()
 
+            A_map = uncertainty_map(ds.clone().detach(), self.num_classes)
             if tar is None:
                 tar = torch.argmax(ds, dim=1, keepdim=True)
-            A_map = uncertainty_map(ds.clone().detach(), self.num_classes)
             pro = UnoB(tar[:, 0].long().detach().cpu().numpy(),A_map.cpu().numpy(),self.bound_size)
             A_map = torch.tensor(pro).cuda()                 
             
@@ -190,7 +190,7 @@ class BasicLayer(nn.Module):
         if self.is_encoder: 
             return x, du, None, None
         elif self.down_or_upsample is not None:
-            if self.num_stage != 5:
+            if self.num_stage != self.num_pool:
                 return du, ds, A_map, ds_T
             else:
                 return du, ds, None, None
@@ -200,7 +200,7 @@ class BasicLayer(nn.Module):
 class UCTNet_2D(SegmentationNetwork):
     def __init__(self, img_size, base_num_features, num_classes, image_channels=1, num_conv_per_stage=2,
                  feat_map_mul_on_downscale=2,  pool_op_kernel_sizes=None, conv_kernel_sizes=None,
-                 deep_supervision=True, max_num_features=None, bound_width=None,
+                 deep_supervision=True, max_num_features=None, bound_sizes=None,
                  dmodels=None, depths=None, num_heads=None, patch_size=None, dim_head=None, add_Map=True,
                  dropout_p=0.1, use_checkpoint=False, **kwargs):
         super().__init__()
@@ -241,7 +241,7 @@ class UCTNet_2D(SegmentationNetwork):
                                base_num_features=base_num_features,
                                input_resolution=(
                                    img_size // np.prod(pool_op_kernel_sizes[:i_layer], 0, dtype=np.int64)), 
-                               bound_width=bound_width[i_layer],
+                               bound_size=bound_sizes[i_layer],
                                dmodel=dmodels[i_layer],
                                depth=depths[i_layer],
                                num_heads=num_heads[i_layer],
@@ -287,11 +287,11 @@ class UCTNet_2D(SegmentationNetwork):
                 x, ds, A_map, ds_T = layer(x, x_skip[self.num_pool-inx], None) if inx > 0 else layer(x, None, None)
             else:
                 x, ds, A_map, ds_T = layer(x, x_skip[self.num_pool-inx], tar[self.num_pool-inx]) if inx > 0 else layer(x, None, None)
-            if inx > 0:
+            if ds_T is not None:
                 out.append(ds)
                 out_ds_T.append(ds_T)
                 out_Amap.append(A_map)
-            if inx == 5:
+            if inx == len(self.up_layers)-1:
                 out.append(x)
                 
         if self.do_ds:

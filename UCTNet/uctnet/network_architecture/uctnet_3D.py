@@ -64,7 +64,7 @@ def uncertainty_map(x,num_classes):
     prob = F.softmax(x,dim=1)     
     log_prob = torch.log2(prob + 1e-6)
     entropy = -1 * torch.sum(prob * log_prob, dim=1) / math.log2(num_classes)
-    one = torch.ones_like(entropy, dtype=torch.int8)  #
+    one = torch.ones_like(entropy, dtype=torch.int8)  
     zero = torch.zeros_like(entropy, dtype=torch.int8)
     entropy = torch.where(entropy>=0.001,one,zero)
     return entropy
@@ -89,7 +89,7 @@ def UnoB(tar,amap,S):
 
 class BasicLayer(nn.Module):
 
-    def __init__(self, num_stage, num_pool, base_num_features, input_resolution=None, bound_width=None, 
+    def __init__(self, num_stage, num_pool, base_num_features, input_resolution=None, bound_size=None, 
                  dmodel=None, depth=None, num_heads=None, add_Map=True, patch_size=None, dim_head=None, 
                  image_channels=1, num_conv_per_stage=2, conv_op=None, norm_op=None, norm_op_kwargs=None,
                  dropout_op=None, dropout_op_kwargs=None, nonlin=None, nonlin_kwargs=None,
@@ -103,7 +103,7 @@ class BasicLayer(nn.Module):
         self.use_checkpoint = use_checkpoint
         self.is_encoder = is_encoder
         self.num_classes = num_classes
-        self.bound_size = bound_width
+        self.bound_size = bound_size
         dim = min((base_num_features * feat_map_mul_on_downscale **
                        num_stage), max_num_features)
         conv_kwargs = {'stride': 1, 'dilation': 1, 'bias': True}
@@ -190,7 +190,7 @@ class BasicLayer(nn.Module):
         if self.is_encoder: 
             return x, du, None, None
         elif self.down_or_upsample is not None:
-            if self.num_stage != 5:
+            if self.num_stage != self.num_pool:
                 return du, ds, A_map, ds_T
             else:
                 return du, ds, None, None
@@ -200,7 +200,7 @@ class BasicLayer(nn.Module):
 class UCTNet_3D(SegmentationNetwork):
     def __init__(self, img_size, base_num_features, num_classes, image_channels=1, num_conv_per_stage=2,
                  feat_map_mul_on_downscale=2,  pool_op_kernel_sizes=None, conv_kernel_sizes=None, 
-                 deep_supervision=True, max_num_features=None, bound_width=None, 
+                 deep_supervision=True, max_num_features=None, bound_sizes=None, 
                  dmodels=None, depths=None, num_heads=None, patch_size=None, dim_head=None, add_Map=True, 
                  dropout_p=0.1, use_checkpoint=False, **kwargs):
         super().__init__()
@@ -241,7 +241,7 @@ class UCTNet_3D(SegmentationNetwork):
                                base_num_features=base_num_features,
                                input_resolution=(
                                    img_size // np.prod(pool_op_kernel_sizes[:i_layer], 0, dtype=np.int64)), 
-                               bound_width=bound_width[i_layer],
+                               bound_size=bound_sizes[i_layer],
                                dmodel=dmodels[i_layer],
                                depth=depths[i_layer],
                                num_heads=num_heads[i_layer],
@@ -287,11 +287,11 @@ class UCTNet_3D(SegmentationNetwork):
                 x, ds, A_map, ds_T = layer(x, x_skip[self.num_pool-inx], None) if inx > 0 else layer(x, None, None)
             else:
                 x, ds, A_map, ds_T = layer(x, x_skip[self.num_pool-inx], tar[self.num_pool-inx]) if inx > 0 else layer(x, None, None)
-            if inx > 0:
+            if ds_T is not None:
                 out.append(ds)
                 out_ds_T.append(ds_T)
                 out_Amap.append(A_map)
-            if inx == 5:
+            if inx == len(self.up_layers)-1:
                 out.append(x)
                 
         if self.do_ds:
